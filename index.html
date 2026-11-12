@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PixelWordo</title>
+<style>
+  :root {
+    --bg: #f4f1ea; --panel: #ffffff; --text: #222; --muted: #777;
+    --accent: #3b82f6; --border: #d6d1c4; --ok: #15803d; --err: #b91c1c; color-scheme: light;
+    --ease: cubic-bezier(.2,.8,.2,1);
+    --bounce: cubic-bezier(.34,1.56,.64,1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1b1d22; --panel: #26292f; --text: #eee; --muted: #999;
+      --accent: #60a5fa; --border: #3a3e47; --ok: #4ade80; --err: #f87171; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1b1d22; --panel: #26292f; --text: #eee; --muted: #999;
+    --accent: #60a5fa; --border: #3a3e47; --ok: #4ade80; --err: #f87171; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: env(safe-area-inset-top, 0px) 12px env(safe-area-inset-bottom, 0px);
+    overflow-x: hidden;
+  }
+
+  /* ---------- Keyframes ---------- */
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  @keyframes pop { 0% { transform: scale(.5); opacity: 0; } 70% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
+  @keyframes pulseRing { 0%, 100% { box-shadow: 0 0 0 2px var(--accent); } 50% { box-shadow: 0 0 0 6px rgba(59,130,246,.22); } }
+  @keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+  @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+  @keyframes plop { 0% { transform: scale(.985); } 45% { transform: scale(1.012); } 100% { transform: scale(1); } }
+  @keyframes wave { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes ripple { to { transform: scale(2.5); opacity: 0; } }
+  @keyframes sparkle {
+    0% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; }
+    100% { transform: translate(var(--dx), var(--dy)) scale(0) rotate(200deg); opacity: 0; }
+  }
+  @keyframes fall {
+    0% { transform: translate(0, -20px) rotate(0deg); opacity: 1; }
+    100% { transform: translate(var(--drift), 110vh) rotate(360deg); opacity: .2; }
+  }
+
+  /* ---------- Layout ---------- */
+  h1 { font-size: 22px; margin: 16px 0 4px; letter-spacing: 1px; text-align: center; }
+  h1 span { display: inline-block; animation: wave 2.4s var(--ease) infinite; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 14px; text-align: center; }
+  .app { display: flex; flex-direction: column; gap: 12px; align-items: center; max-width: 900px; margin: 0 auto; padding-bottom: 24px; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; width: 100%;
+    animation: fadeUp .55s var(--ease) both; transition: border-color .3s, background .3s;
+  }
+  .panel:hover { border-color: rgba(59,130,246,.35); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .between { justify-content: space-between; }
+  .label { font-size: 12px; color: var(--muted); margin-right: 4px; }
+  .hidden { display: none !important; }
+
+  /* ---------- Controls ---------- */
+  button, select, input[type="text"] {
+    font: inherit; font-size: 14px; padding: 7px 12px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text);
+    transition: transform .18s var(--bounce), filter .2s, border-color .2s, box-shadow .2s, background .2s;
+    position: relative; overflow: hidden;
+  }
+  button { cursor: pointer; }
+  button:hover { transform: translateY(-2px); filter: brightness(1.06); box-shadow: 0 4px 10px rgba(0,0,0,.08); }
+  button:active { transform: scale(.93); box-shadow: none; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button:disabled { opacity: .5; cursor: default; transform: none; box-shadow: none; }
+  button.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); animation: pulseRing 2.2s ease-in-out infinite; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.primary:hover { background: var(--accent); filter: brightness(1.1); }
+  button.flash::after {
+    content: ""; position: absolute; inset: 0; border-radius: inherit;
+    background: radial-gradient(circle, rgba(255,255,255,.55) 0%, transparent 60%);
+    transform: scale(0); animation: ripple .6s var(--ease) forwards; pointer-events: none;
+  }
+  input[type="text"] { min-width: 200px; cursor: text; }
+  input[type="text"]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,.2); }
+  select { cursor: pointer; }
+  input[type="color"] { width: 40px; height: 34px; border: none; background: none; padding: 0; cursor: pointer; transition: transform .2s var(--bounce); }
+  input[type="color"]:hover { transform: scale(1.12) rotate(-4deg); }
+  .tabs { display: flex; gap: 6px; }
+  .tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* ---------- Palette ---------- */
+  .palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+  .recent { display: flex; gap: 6px; flex-wrap: wrap; min-height: 26px; }
+  .swatch {
+    width: 100%; aspect-ratio: 1; border-radius: 6px; border: 2px solid var(--border); cursor: pointer; padding: 0;
+    transition: transform .2s var(--bounce), border-color .2s, box-shadow .2s;
+    animation: pop .4s var(--bounce) both;
+  }
+  .swatch:nth-child(2) { animation-delay: .02s; } .swatch:nth-child(3) { animation-delay: .04s; } .swatch:nth-child(4) { animation-delay: .06s; }
+  .swatch:nth-child(5) { animation-delay: .08s; } .swatch:nth-child(6) { animation-delay: .1s; } .swatch:nth-child(7) { animation-delay: .12s; }
+  .swatch:nth-child(8) { animation-delay: .14s; } .swatch:nth-child(n+9) { animation-delay: .18s; }
+  .swatch:hover { transform: scale(1.14) rotate(-3deg); }
+  .swatch:active { transform: scale(.9); }
+  .swatch.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  .mini { width: 26px; height: 26px; padding: 0; border-radius: 6px; animation: pop .35s var(--bounce) both; }
+
+  /* ---------- Canvas ---------- */
+  .stage-wrap {
+    width: 100%; display: flex; justify-content: center; padding: 8px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: auto;
+    animation: fadeUp .6s var(--ease) both; animation-delay: .1s; position: relative;
+  }
+  canvas {
+    display: block; touch-action: none; cursor: crosshair; image-rendering: pixelated;
+    background-color: #fff; transition: box-shadow .3s;
+    background-image:
+      linear-gradient(45deg, #ccc 25%, transparent 25%),
+      linear-gradient(-45deg, #ccc 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #ccc 75%),
+      linear-gradient(-45deg, transparent 75%, #ccc 75%);
+    background-size: 12px 12px;
+    background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+  }
+  canvas.plop { animation: plop .25s var(--ease); }
+  canvas:hover { box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+  .spark { position: fixed; width: 8px; height: 8px; border-radius: 2px; pointer-events: none; z-index: 60; animation: sparkle .8s var(--ease) forwards; }
+  .falling { position: fixed; top: 0; width: 12px; height: 12px; pointer-events: none; z-index: 60; animation: fall var(--dur) linear forwards; }
+
+  /* ---------- Status and text ---------- */
+  .hint, .size-info, .account-note { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .status { font-size: 13px; min-height: 18px; display: inline-flex; align-items: center; gap: 6px; }
+  .status.ok { color: var(--ok); animation: pop .4s var(--bounce); }
+  .status.err { color: var(--err); animation: shake .5s; }
+  .status.busy::before {
+    content: ""; width: 12px; height: 12px; border: 2px solid var(--muted); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin .7s linear infinite; display: inline-block;
+  }
+  #accountTitle { animation: slideIn .5s var(--ease) both; }
+
+  /* ---------- Library ---------- */
+  #libPanel:not(.hidden) { animation: slideDown .4s var(--ease) both; }
+  .lib-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); animation: slideIn .4s var(--ease) both; transition: background .2s; flex-wrap: wrap; }
+  .lib-item:hover { background: rgba(59,130,246,.06); }
+  .lib-item:last-child { border-bottom: none; }
+  .lib-meta { font-size: 12px; color: var(--muted); }
+
+  /* ---------- Phone adaptation ---------- */
+  @media (hover: none) {
+    button:hover { transform: none; filter: none; box-shadow: none; }
+    .swatch:hover { transform: none; }
+    canvas:hover { box-shadow: none; }
+    .panel:hover { border-color: var(--border); }
+  }
+  @media (max-width: 600px) {
+    body { padding: env(safe-area-inset-top, 0px) 8px env(safe-area-inset-bottom, 0px); }
+    .app { gap: 8px; padding-bottom: 16px; }
+    h1 { font-size: 19px; margin: 10px 0 2px; }
+    .sub, .hint { display: none; }
+    .panel { padding: 8px; border-radius: 10px; }
+    .row { gap: 6px; }
+    .row.between { flex-direction: column; align-items: stretch; }
+    .row.between > .row { justify-content: center; }
+    .label { width: 100%; margin: 0; }
+    button { padding: 9px 10px; min-height: 40px; font-size: 14px; flex: 1 1 auto; }
+    button.tool { flex: 1 1 30%; }
+    .tabs button { flex: 1; }
+    input[type="text"] { width: 100%; min-width: 0; font-size: 16px; flex: 1 1 100%; min-height: 40px; }
+    select { min-height: 40px; }
+    input[type="color"] { height: 40px; width: 48px; }
+    .palette { gap: 4px; }
+    .swatch { border-width: 1px; }
+    .mini { width: 32px; height: 32px; }
+    .stage-wrap { padding: 4px; border-radius: 10px; }
+    canvas { max-width: 100%; height: auto; }
+    .status { width: 100%; justify-content: center; }
+    .size-info { font-size: 11px; }
+    .lib-item { flex-direction: column; align-items: stretch; }
+    .lib-item .row { justify-content: flex-start; }
+    .modal-box { max-width: 92vw; }
+    #libPanel .row.between { flex-direction: row; }
+  }
+
+  /* ---------- Modal ---------- */
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+  .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px; max-width: 340px; width: 100%; animation: pop .3s var(--bounce); }
+  .modal-box p { margin: 0 0 14px; font-size: 15px; }
+
+  /* ---------- Animations switch ---------- */
+  body.no-anim *, body.no-anim *::before, body.no-anim *::after {
+    animation: none !important; transition: none !important;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div>
+    <h1 id="title"></h1>
+    <div class="sub">Рисуй пикселями</div>
+  </div>
+
+  <div class="panel">
+    <div class="row between">
+      <div>
+        <div id="accountTitle" style="font-size:14px">Проверяем вход...</div>
+        <div class="account-note" id="accountNote"></div>
+      </div>
+      <div class="row">
+        <button id="animToggle" title="Включить или выключить анимации">Анимации: вкл</button>
+        <button id="libToggle">Мои рисунки</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="libPanel">
+    <div class="row between" style="margin-bottom:8px">
+      <div class="tabs">
+        <button id="tabDrawings" class="on">Рисунки</button>
+        <button id="tabDrafts">Черновики</button>
+      </div>
+      <button id="newBtnLib">Новый лист</button>
+    </div>
+    <div id="libList"><div class="account-note">Загрузка...</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <span class="label">Инструмент:</span>
+      <button data-tool="pencil" class="tool active" title="P">Карандаш</button>
+      <button data-tool="eraser" class="tool" title="E">Ластик</button>
+      <button data-tool="fill" class="tool" title="F">Заливка</button>
+      <button data-tool="picker" class="tool" title="I">Пипетка</button>
+      <button data-tool="line" class="tool" title="L">Линия</button>
+      <button data-tool="rect" class="tool" title="R">Прямоугольник</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="row between">
+      <div class="row">
+        <span class="label">Свой цвет:</span>
+        <input type="color" id="customColor" value="#e63946" title="Свой цвет">
+      </div>
+      <div class="row">
+        <span class="label">Размер:</span>
+        <select id="sizeSelect">
+          <option value="16">16×16</option>
+          <option value="32" selected>32×32</option>
+          <option value="48">48×48</option>
+          <option value="64">64×64</option>
+        </select>
+      </div>
+    </div>
+    <div class="palette" id="palette" style="margin-top:10px"></div>
+    <div class="label" style="margin:10px 0 4px">Недавние:</div>
+    <div class="recent" id="recent"></div>
+  </div>
+
+  <div class="stage-wrap">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <input type="text" id="nameInput" placeholder="Название" maxlength="60">
+      <button id="saveBtn" class="primary">Сохранить</button>
+      <button id="draftBtn">В черновики</button>
+      <button id="newBtn">Новый рисунок</button>
+      <span class="status" id="status"></span>
+    </div>
+    <div class="row between" style="margin-top:10px">
+      <div class="row">
+        <button id="undoBtn" title="Ctrl+Z">Отменить</button>
+        <button id="redoBtn" title="Ctrl+Y">Повторить</button>
+        <button id="mirrorBtn" title="M">Зеркало</button>
+        <button id="gridBtn" title="G">Сетка</button>
+        <button id="clearBtn">Очистить</button>
+      </div>
+      <div class="row">
+        <button id="importBtn">Открыть картинку</button>
+        <button id="exportBtn">Скачать PNG</button>
+      </div>
+    </div>
+    <input type="file" id="importInput" accept="image/*" hidden>
+    <div class="hint" style="margin-top:10px">
+      Горячие клавиши: P карандаш · E ластик · F заливка · I пипетка · L линия · R прямоугольник · M зеркало · G сетка · N новый рисунок · Ctrl+Z / Ctrl+Y отмена и возврат.
+    </div>
+    <div class="size-info" id="sizeInfo" style="margin-top:6px"></div>
+  </div>
+</div>
+
+<script>
+  const PALETTE = [
+    "#000000", "#ffffff", "#808080", "#c0c0c0",
+    "#e63946", "#f4a261", "#e9c46a", "#ffd60a",
+    "#2a9d8f", "#57cc99", "#00b4d8", "#0077b6",
+    "#3a0ca3", "#7209b7", "#f72585", "#8d5524",
+    "#6b4226", "#ffb3c6", "#cdb4db", "#a8dadc",
+    "#1d3557", "#264653", "#38b000", "#9ef01a"
+  ];
+  const DRAFT_KEY = "pixelwordo-draft";
+  const RECENT_KEY = "pixelwordo-recent";
+  const LIB_KEY = "pixelwordo-library";
+  const ANIM_KEY = "pixelwordo-anim";
+
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  const paletteEl = document.getElementById("palette");
+  const recentEl = document.getElementById("recent");
+  const customColor = document.getElementById("customColor");
+  const sizeSelect = document.getElementById("sizeSelect");
+  const sizeInfo = document.getElementById("sizeInfo");
+  const mirrorBtn = document.getElementById("mirrorBtn");
+  const gridBtn = document.getElementById("gridBtn");
+  const nameInput = document.getElementById("nameInput");
+  const statusEl = document.getElementById("status");
+
+  let size = 32;
+  let grid = [];
+  let cell = 16;
+  let color = PALETTE[0];
+  let tool = "pencil";
+  let drawing = false;
+  let start = null;
+  let last = null;
+  let base = null;
+  let undoStack = [];
+  let redoStack = [];
+  let mirror = false;
+  let showGrid = true;
+  let recent = [];
+  let currentId = null;
+  let currentKind = "drawing";
+  let libTab = "drawing";
+
+  // ---------- Анимации ----------
+  function animOn() { return !document.body.classList.contains("no-anim"); }
+
+  function setAnim(on) {
+    document.body.classList.toggle("no-anim", !on);
+    document.getElementById("animToggle").textContent = on ? "Анимации: вкл" : "Анимации: выкл";
+    try { localStorage.setItem(ANIM_KEY, on ? "1" : "0"); } catch (e) {}
+  }
+
+  function rippleOn(el) {
+    if (!animOn()) return;
+    el.classList.remove("flash");
+    void el.offsetWidth;
+    el.classList.add("flash");
+    setTimeout(() => el.classList.remove("flash"), 650);
+  }
+
+  function burst(el, count = 14) {
+    if (!animOn()) return;
+    const r = el.getBoundingClientRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    for (let i = 0; i < count; i++) {
+      const s = document.createElement("span");
+      s.className = "spark";
+      const angle = (Math.PI * 2 * i) / count + Math.random() * .3;
+      const dist = 40 + Math.random() * 50;
+      s.style.left = cx + "px";
+      s.style.top = cy + "px";
+      s.style.background = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+      s.style.setProperty("--dx", Math.cos(angle) * dist + "px");
+      s.style.setProperty("--dy", Math.sin(angle) * dist + "px");
+      document.body.appendChild(s);
+      setTimeout(() => s.remove(), 900);
+    }
+  }
+
+  function pixelRain(count = 36) {
+    if (!animOn()) return;
+    for (let i = 0; i < count; i++) {
+      const f = document.createElement("span");
+      f.className = "falling";
+      f.style.left = Math.random() * 100 + "vw";
+      f.style.background = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+      f.style.setProperty("--drift", (Math.random() * 120 - 60) + "px");
+      const dur = 1.2 + Math.random() * 1.1;
+      f.style.setProperty("--dur", dur + "s");
+      f.style.animationDelay = (Math.random() * .4) + "s";
+      document.body.appendChild(f);
+      setTimeout(() => f.remove(), (dur + .6) * 1000);
+    }
+  }
+
+  function plopCanvas() {
+    if (!animOn()) return;
+    canvas.classList.remove("plop");
+    void canvas.offsetWidth;
+    canvas.classList.add("plop");
+  }
+
+  function animateTitle() {
+    const title = document.getElementById("title");
+    title.innerHTML = "";
+    [..."PixelWordo"].forEach((ch, i) => {
+      const s = document.createElement("span");
+      s.textContent = ch;
+      s.style.animationDelay = (i * 0.12) + "s";
+      title.appendChild(s);
+    });
+  }
+
+  // ---------- Аккаунт и хранилище ----------
+  let cloud = null;
+  let accountName = "";
+
+  async function getCap(name) {
+    try { return window.claude ? await window.claude.use(name) : null; } catch (e) { return null; }
+  }
+
+  async function initAccount() {
+    const db = await getCap("db");
+    const user = await getCap("user");
+    let uid = null;
+    if (db && user) {
+      try { uid = await user.id(); } catch (e) { uid = null; }
+      try { const me = await user.me(); accountName = me.name || ""; } catch (e) {}
+    }
+    if (db && uid) {
+      cloud = { db, uid, col: () => db.collection("data/users/" + uid) };
+      document.getElementById("accountTitle").textContent = "Вы вошли как " + (accountName || "пользователь");
+      document.getElementById("accountNote").textContent = "Рисунки и черновики сохраняются в вашем аккаунте и доступны с любого устройства.";
+    } else {
+      document.getElementById("accountTitle").textContent = "Вход не выполнен";
+      document.getElementById("accountNote").textContent = "Рисунки сохраняются только в этом браузере. Чтобы хранить их в аккаунте, войдите в свой аккаунт Claude.";
+    }
+  }
+
+  function readLocalLib() {
+    try { return JSON.parse(localStorage.getItem(LIB_KEY) || "{}"); } catch (e) { return {}; }
+  }
+  function writeLocalLib(lib) { localStorage.setItem(LIB_KEY, JSON.stringify(lib)); }
+
+  async function libAll() {
+    if (cloud) {
+      const snap = await cloud.col().get();
+      return snap.docs.filter(d => d.exists).map(d => ({ id: d.id, ...d.data() }));
+    }
+    return Object.values(readLocalLib());
+  }
+
+  async function libGet(id) {
+    if (cloud) {
+      const snap = await cloud.col().doc(id).get();
+      return snap.exists ? { id, ...snap.data() } : null;
+    }
+    return readLocalLib()[id] || null;
+  }
+
+  async function libSave(entry) {
+    if (cloud) { await cloud.col().doc(entry.id).set(entry); return; }
+    const lib = readLocalLib();
+    lib[entry.id] = entry;
+    writeLocalLib(lib);
+  }
+
+  async function libDelete(id) {
+    if (cloud) { await cloud.col().doc(id).delete(); return; }
+    const lib = readLocalLib();
+    delete lib[id];
+    writeLocalLib(lib);
+  }
+
+  function newId() {
+    return "d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+
+  function setStatus(text, kind) {
+    statusEl.textContent = text;
+    statusEl.className = "status" + (kind ? " " + kind : "");
+  }
+
+  function hasPixels() {
+    return grid.some(row => row.some(Boolean));
+  }
+
+  // Сохраняет текущий лист в нужный раздел: "drawing" или "draft"
+  async function saveAs(kind, fallbackName) {
+    const name = nameInput.value.trim() || fallbackName || "Без названия";
+    if (!currentId) currentId = newId();
+    currentKind = kind;
+    const entry = { id: currentId, name, size, grid, kind, updated: new Date().toISOString() };
+    setStatus("Сохраняем...", "busy");
+    try {
+      await libSave(entry);
+      nameInput.value = name;
+      setStatus(kind === "draft" ? "Сохранено в черновики" : "Сохранено в рисунки", "ok");
+      burst(document.getElementById(kind === "draft" ? "draftBtn" : "saveBtn"));
+      refreshLibrary();
+      return true;
+    } catch (e) {
+      setStatus("Не удалось сохранить: " + (e && e.message ? e.message : "ошибка"), "err");
+      return false;
+    }
+  }
+
+  async function openEntry(id) {
+    const entry = await libGet(id);
+    if (!entry || !Array.isArray(entry.grid)) { setStatus("Рисунок не найден", "err"); return; }
+    size = entry.size;
+    grid = entry.grid;
+    sizeSelect.value = String(size);
+    currentId = entry.id;
+    currentKind = entry.kind || "drawing";
+    nameInput.value = entry.name || "";
+    undoStack = [];
+    redoStack = [];
+    document.getElementById("libPanel").classList.add("hidden");
+    fitCell();
+    commitAndSave();
+    setStatus("Открыт: " + (entry.name || "Без названия"), "ok");
+  }
+
+  async function moveEntry(id, kind) {
+    const entry = await libGet(id);
+    if (!entry) return;
+    entry.kind = kind;
+    entry.updated = new Date().toISOString();
+    try {
+      await libSave(entry);
+      if (currentId === id) currentKind = kind;
+      setStatus(kind === "draft" ? "Перенесено в черновики" : "Перенесено в рисунки", "ok");
+      refreshLibrary();
+    } catch (e) {
+      setStatus("Не удалось перенести: " + (e && e.message ? e.message : "ошибка"), "err");
+    }
+  }
+
+  async function removeEntry(id) {
+    if (!(await askConfirm("Удалить навсегда?"))) return;
+    try {
+      await libDelete(id);
+      if (currentId === id) { currentId = null; nameInput.value = ""; }
+      refreshLibrary();
+      setStatus("Удалено", "ok");
+    } catch (e) {
+      setStatus("Не удалось удалить: " + (e && e.message ? e.message : "ошибка"), "err");
+    }
+  }
+
+  function setLibTab(tab) {
+    libTab = tab;
+    document.getElementById("tabDrawings").classList.toggle("on", tab === "drawing");
+    document.getElementById("tabDrafts").classList.toggle("on", tab === "draft");
+    refreshLibrary();
+  }
+
+  async function refreshLibrary() {
+    const listEl = document.getElementById("libList");
+    try {
+      const all = await libAll();
+      const items = all
+        .filter(it => (it.kind || "drawing") === libTab)
+        .sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
+      if (!items.length) {
+        listEl.innerHTML = libTab === "draft"
+          ? '<div class="account-note">Черновиков пока нет. Сюда можно отправить неудачные или ненужные рисунки.</div>'
+          : '<div class="account-note">Пока нет сохранённых рисунков</div>';
+        return;
+      }
+      listEl.innerHTML = "";
+      items.forEach((it, i) => {
+        const row = document.createElement("div");
+        row.className = "lib-item";
+        row.style.animationDelay = (i * 0.05) + "s";
+        const info = document.createElement("div");
+        const title = document.createElement("div");
+        title.textContent = it.name || "Без названия";
+        title.style.fontSize = "14px";
+        const meta = document.createElement("div");
+        meta.className = "lib-meta";
+        const d = it.updated ? new Date(it.updated).toLocaleString("ru-RU") : "";
+        meta.textContent = `${it.size}×${it.size}` + (d ? " · " + d : "");
+        info.appendChild(title);
+        info.appendChild(meta);
+        const actions = document.createElement("div");
+        actions.className = "row";
+        const open = document.createElement("button");
+        open.textContent = "Открыть";
+        open.addEventListener("click", () => openEntry(it.id));
+        const move = document.createElement("button");
+        move.textContent = libTab === "draft" ? "В рисунки" : "В черновики";
+        move.addEventListener("click", () => moveEntry(it.id, libTab === "draft" ? "drawing" : "draft"));
+        const del = document.createElement("button");
+        del.textContent = "Удалить";
+        del.addEventListener("click", () => removeEntry(it.id));
+        actions.appendChild(open);
+        actions.appendChild(move);
+        actions.appendChild(del);
+        row.appendChild(info);
+        row.appendChild(actions);
+        listEl.appendChild(row);
+      });
+    } catch (e) {
+      listEl.innerHTML = '<div class="account-note">Не удалось загрузить список: ' + (e && e.message ? e.message : "ошибка") + "</div>";
+    }
+  }
+
+  // ---------- Холст ----------
+  function newGrid(n) { return Array.from({ length: n }, () => Array(n).fill(null)); }
+  function cloneGrid(g) { return g.map(row => row.slice()); }
+  function hex(r, g, b) { return "#" + [r, g, b].map(v => v.toString(16).padStart(2, "0")).join(""); }
+
+  function fitCell() {
+    const avail = Math.min(window.innerWidth - 60, 640);
+    cell = Math.max(6, Math.floor(avail / size));
+    canvas.width = size * cell;
+    canvas.height = size * cell;
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const c = grid[y][x];
+        if (c) { ctx.fillStyle = c; ctx.fillRect(x * cell, y * cell, cell, cell); }
+      }
+    }
+    if (showGrid && cell >= 6) {
+      ctx.strokeStyle = "rgba(128,128,128,0.25)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0; i <= size; i++) {
+        const p = i * cell + 0.5;
+        ctx.moveTo(p, 0); ctx.lineTo(p, canvas.height);
+        ctx.moveTo(0, p); ctx.lineTo(canvas.width, p);
+      }
+      ctx.stroke();
+    }
+    if (mirror) {
+      ctx.strokeStyle = "rgba(59,130,246,0.7)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(canvas.width / 2, 0); ctx.lineTo(canvas.width / 2, canvas.height);
+      ctx.stroke();
+    }
+  }
+
+  function saveDraft() {
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ size, grid })); } catch (e) {}
+  }
+
+  function loadDraft() {
+    try {
+      const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
+      if (d && [16, 32, 48, 64].includes(d.size) && Array.isArray(d.grid) && d.grid.length === d.size) {
+        size = d.size;
+        grid = d.grid;
+        sizeSelect.value = String(size);
+      }
+    } catch (e) {}
+    if (!grid.length) grid = newGrid(size);
+  }
+
+  function saveRecent() {
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent)); } catch (e) {}
+  }
+
+  function loadRecent() {
+    try { recent = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]").slice(0, 8); } catch (e) { recent = []; }
+  }
+
+  function pushUndo() {
+    undoStack.push(cloneGrid(grid));
+    if (undoStack.length > 80) undoStack.shift();
+    redoStack = [];
+  }
+
+  function updateInfo() {
+    const used = grid.reduce((n, row) => n + row.filter(Boolean).length, 0);
+    sizeInfo.textContent = `Холст ${size}×${size} · закрашено пикселей: ${used}`;
+  }
+
+  function plot(x, y) {
+    if (x < 0 || y < 0 || x >= size || y >= size) return;
+    const value = tool === "eraser" ? null : color;
+    grid[y][x] = value;
+    if (mirror) grid[y][size - 1 - x] = value;
+  }
+
+  function line(x0, y0, x1, y1, fn) {
+    let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+    let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+    let err = dx + dy;
+    while (true) {
+      fn(x0, y0);
+      if (x0 === x1 && y0 === y1) break;
+      const e2 = 2 * err;
+      if (e2 >= dy) { err += dy; x0 += sx; }
+      if (e2 <= dx) { err += dx; y0 += sy; }
+    }
+  }
+
+  function drawRect(a, b) {
+    const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x);
+    const y0 = Math.min(a.y, b.y), y1 = Math.max(a.y, b.y);
+    line(x0, y0, x1, y0, plot);
+    line(x0, y1, x1, y1, plot);
+    line(x0, y0, x0, y1, plot);
+    line(x1, y0, x1, y1, plot);
+  }
+
+  function floodFill(sx, sy) {
+    const target = grid[sy][sx];
+    if (target === color) return;
+    const stack = [[sx, sy]];
+    while (stack.length) {
+      const [x, y] = stack.pop();
+      if (x < 0 || y < 0 || x >= size || y >= size) continue;
+      if (grid[y][x] !== target) continue;
+      grid[y][x] = color;
+      stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+    }
+  }
+
+  function eventToCell(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) * (canvas.width / rect.width) / cell);
+    const y = Math.floor((e.clientY - rect.top) * (canvas.height / rect.height) / cell);
+    return { x, y };
+  }
+
+  function inBounds(p) { return p.x >= 0 && p.y >= 0 && p.x < size && p.y < size; }
+
+  function addRecent(c) {
+    recent = [c, ...recent.filter(r => r !== c)].slice(0, 8);
+    saveRecent();
+    renderRecent();
+  }
+
+  function setColor(c, remember = false) {
+    color = c;
+    customColor.value = c;
+    document.querySelectorAll(".swatch").forEach(s => s.classList.toggle("active", s.dataset.color === c));
+    if (remember) addRecent(c);
+  }
+
+  function setTool(t) {
+    tool = t;
+    document.querySelectorAll(".tool").forEach(b => {
+      const on = b.dataset.tool === t;
+      if (on && !b.classList.contains("active")) rippleOn(b);
+      b.classList.toggle("active", on);
+    });
+    canvas.style.cursor = t === "fill" ? "cell" : t === "picker" ? "copy" : "crosshair";
+  }
+
+  function commitAndSave() {
+    render();
+    updateInfo();
+    saveDraft();
+    plopCanvas();
+  }
+
+  canvas.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    const p = eventToCell(e);
+    if (!inBounds(p)) return;
+    if (tool === "picker") {
+      if (grid[p.y][p.x]) { setColor(grid[p.y][p.x], true); setTool("pencil"); }
+      return;
+    }
+    canvas.setPointerCapture(e.pointerId);
+    pushUndo();
+    if (tool === "fill") {
+      floodFill(p.x, p.y);
+      commitAndSave();
+      return;
+    }
+    drawing = true;
+    start = p;
+    last = p;
+    base = cloneGrid(grid);
+    if (tool === "pencil" || tool === "eraser") {
+      plot(p.x, p.y);
+      render();
+    }
+  });
+
+  canvas.addEventListener("pointermove", e => {
+    if (!drawing) return;
+    const p = eventToCell(e);
+    if (tool === "pencil" || tool === "eraser") {
+      line(last.x, last.y, p.x, p.y, plot);
+      last = p;
+      render();
+    } else if (tool === "line" || tool === "rect") {
+      grid = cloneGrid(base);
+      if (tool === "line") line(start.x, start.y, p.x, p.y, plot);
+      else drawRect(start, p);
+      render();
+    }
+  });
+
+  function endStroke(e) {
+    if (!drawing) return;
+    drawing = false;
+    const p = eventToCell(e);
+    if (tool === "line" || tool === "rect") {
+      grid = cloneGrid(base);
+      const q = inBounds(p) ? p : last;
+      if (tool === "line") line(start.x, start.y, q.x, q.y, plot);
+      else drawRect(start, q);
+    }
+    if (tool === "pencil" && color && !recent.includes(color)) addRecent(color);
+    commitAndSave();
+  }
+  canvas.addEventListener("pointerup", endStroke);
+  canvas.addEventListener("pointercancel", () => { drawing = false; grid = base ? cloneGrid(base) : grid; render(); });
+
+  function undo() {
+    if (!undoStack.length) { setStatus("Нечего отменять", ""); return; }
+    redoStack.push(cloneGrid(grid));
+    grid = undoStack.pop();
+    commitAndSave();
+  }
+
+  function redo() {
+    if (!redoStack.length) { setStatus("Нечего повторять", ""); return; }
+    undoStack.push(cloneGrid(grid));
+    grid = redoStack.pop();
+    commitAndSave();
+  }
+
+  function buildPalette() {
+    paletteEl.innerHTML = "";
+    PALETTE.forEach(c => {
+      const b = document.createElement("button");
+      b.className = "swatch";
+      b.style.background = c;
+      b.dataset.color = c;
+      b.title = c;
+      b.addEventListener("click", () => {
+        setColor(c, true);
+        if (tool === "eraser") setTool("pencil");
+      });
+      paletteEl.appendChild(b);
+    });
+  }
+
+  function renderRecent() {
+    recentEl.innerHTML = "";
+    if (!recent.length) {
+      recentEl.innerHTML = '<span class="size-info">Пока пусто: выбранные цвета появятся здесь</span>';
+      return;
+    }
+    recent.forEach((c, i) => {
+      const b = document.createElement("button");
+      b.className = "swatch mini" + (c === color ? " active" : "");
+      b.style.background = c;
+      b.style.animationDelay = (i * 0.04) + "s";
+      b.title = c;
+      b.addEventListener("click", () => {
+        setColor(c, true);
+        if (tool === "eraser") setTool("pencil");
+      });
+      recentEl.appendChild(b);
+    });
+  }
+
+  document.querySelectorAll(".tool").forEach(b => b.addEventListener("click", () => setTool(b.dataset.tool)));
+
+  customColor.addEventListener("input", e => {
+    setColor(e.target.value);
+    if (tool === "eraser") setTool("pencil");
+  });
+  customColor.addEventListener("change", e => addRecent(e.target.value));
+
+  sizeSelect.addEventListener("change", e => {
+    size = parseInt(e.target.value, 10);
+    grid = newGrid(size);
+    undoStack = [];
+    redoStack = [];
+    currentId = null;
+    fitCell();
+    commitAndSave();
+  });
+
+  document.getElementById("undoBtn").addEventListener("click", undo);
+  document.getElementById("redoBtn").addEventListener("click", redo);
+
+  mirrorBtn.addEventListener("click", () => {
+    mirror = !mirror;
+    mirrorBtn.classList.toggle("active", mirror);
+    render();
+  });
+
+  gridBtn.addEventListener("click", () => {
+    showGrid = !showGrid;
+    gridBtn.classList.toggle("active", showGrid);
+    render();
+  });
+
+  document.getElementById("clearBtn").addEventListener("click", async () => {
+    if (!(await askConfirm("Очистить холст?"))) return;
+    pushUndo();
+    grid = newGrid(size);
+    commitAndSave();
+  });
+
+  document.getElementById("saveBtn").addEventListener("click", () => saveAs("drawing"));
+  document.getElementById("draftBtn").addEventListener("click", () => saveAs("draft", "Черновик"));
+
+  // Новый рисунок: текущий лист уходит в черновики (если на нём что-то есть), затем чистый лист
+  async function newDrawing() {
+    if (hasPixels()) {
+      const ok = !currentId
+        ? await saveAs("draft", "Черновик " + new Date().toLocaleString("ru-RU"))
+        : await saveAs(currentKind || "drawing");
+      if (!ok) { setStatus("Лист не очищен: сначала исправьте ошибку сохранения", "err"); return; }
+    }
+    pushUndo();
+    currentId = null;
+    currentKind = "drawing";
+    nameInput.value = "";
+    grid = newGrid(size);
+    undoStack = [];
+    redoStack = [];
+    commitAndSave();
+    pixelRain();
+    setStatus("Новый лист", "ok");
+    document.getElementById("libPanel").classList.add("hidden");
+  }
+
+  document.getElementById("newBtn").addEventListener("click", newDrawing);
+  document.getElementById("newBtnLib").addEventListener("click", newDrawing);
+
+  document.getElementById("libToggle").addEventListener("click", () => {
+    const panel = document.getElementById("libPanel");
+    panel.classList.toggle("hidden");
+    if (!panel.classList.contains("hidden")) refreshLibrary();
+  });
+  document.getElementById("tabDrawings").addEventListener("click", () => setLibTab("drawing"));
+  document.getElementById("tabDrafts").addEventListener("click", () => setLibTab("draft"));
+
+  document.getElementById("animToggle").addEventListener("click", () => setAnim(!animOn()));
+
+  const importInput = document.getElementById("importInput");
+  document.getElementById("importBtn").addEventListener("click", () => importInput.click());
+  importInput.addEventListener("change", e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = size; c.height = size;
+      const cx = c.getContext("2d");
+      const k = Math.min(size / img.width, size / img.height);
+      const w = img.width * k, h = img.height * k;
+      cx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+      const d = cx.getImageData(0, 0, size, size).data;
+      pushUndo();
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const i = (y * size + x) * 4;
+          grid[y][x] = d[i + 3] > 127 ? hex(d[i], d[i + 1], d[i + 2]) : null;
+        }
+      }
+      URL.revokeObjectURL(img.src);
+      commitAndSave();
+    };
+    img.src = URL.createObjectURL(f);
+    e.target.value = "";
+  });
+
+  document.getElementById("exportBtn").addEventListener("click", () => {
+    const scale = 16;
+    const out = document.createElement("canvas");
+    out.width = size * scale;
+    out.height = size * scale;
+    const octx = out.getContext("2d");
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const c = grid[y][x];
+        if (c) { octx.fillStyle = c; octx.fillRect(x * scale, y * scale, scale, scale); }
+      }
+    }
+    saveFile(`${(nameInput.value.trim() || "pixelwordo")}-${size}x${size}.png`, out);
+  });
+
+  document.addEventListener("pointerdown", e => {
+    const b = e.target.closest("button");
+    if (b && !b.classList.contains("swatch") && !b.disabled) rippleOn(b);
+  });
+
+  document.addEventListener("keydown", e => {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+    const k = e.key.toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && k === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+    if ((e.ctrlKey || e.metaKey) && k === "y") { e.preventDefault(); redo(); return; }
+    const map = { p: "pencil", e: "eraser", f: "fill", i: "picker", l: "line", r: "rect" };
+    if (map[k]) setTool(map[k]);
+    if (k === "m") mirrorBtn.click();
+    if (k === "g") gridBtn.click();
+    if (k === "n") newDrawing();
+  });
+
+  window.addEventListener("resize", () => { fitCell(); render(); });
+
+  // ---------- Диалоги и файлы ----------
+  function askConfirm(message) {
+    return new Promise(resolve => {
+      const modal = document.getElementById("modal");
+      const ok = document.getElementById("modalOk");
+      const cancel = document.getElementById("modalCancel");
+      document.getElementById("modalText").textContent = message;
+      modal.classList.remove("hidden");
+      function done(v) {
+        modal.classList.add("hidden");
+        ok.onclick = null;
+        cancel.onclick = null;
+        modal.onclick = null;
+        resolve(v);
+      }
+      ok.onclick = () => done(true);
+      cancel.onclick = () => done(false);
+      modal.onclick = e => { if (e.target === modal) done(false); };
+      ok.focus();
+    });
+  }
+
+  async function saveFile(filename, outCanvas) {
+    const blob = await new Promise(r => outCanvas.toBlob(r, "image/png"));
+    const dl = await getCap("downloads");
+    if (dl) {
+      try {
+        await dl.save({ filename, data: blob });
+        setStatus("Файл сохранён", "ok");
+        return;
+      } catch (e) {
+        if (e && e.code === "declined") { setStatus("Сохранение отменено", ""); return; }
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    setStatus("Скачивание начато", "ok");
+  }
+
+  // ---------- Старт ----------
+  let animPref = true;
+  try { animPref = localStorage.getItem(ANIM_KEY) !== "0"; } catch (e) {}
+  setAnim(animPref);
+
+  animateTitle();
+  document.querySelectorAll(".panel").forEach((p, i) => { p.style.animationDelay = (i * 0.07) + "s"; });
+  loadDraft();
+  loadRecent();
+  buildPalette();
+  renderRecent();
+  setColor(PALETTE[0]);
+  setTool("pencil");
+  gridBtn.classList.add("active");
+  fitCell();
+  render();
+  updateInfo();
+
+  initAccount().then(() => refreshLibrary());
+</script>
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <p id="modalText"></p>
+    <div class="row" style="justify-content:flex-end">
+      <button id="modalCancel">Отмена</button>
+      <button id="modalOk" class="primary">Да</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
